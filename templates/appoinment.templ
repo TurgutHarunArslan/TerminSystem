@@ -1,0 +1,159 @@
+package templates
+
+templ AppointmentForm() {
+	<form id="appointmentForm" action="/api/termins" method="POST">
+		<label for="name">Name:</label>
+		<input type="text" id="name" name="name" required/>
+		<label for="email">Email:</label>
+		<input type="text" id="email" name="email" required/>
+		<label for="phone">Nummer:</label>
+		<input type="tel" id="phone" name="phone" pattern="(\+49\s?|0)[1-9][0-9\s\-]{3,14}" placeholder="+49 30 1234 5678" required/>
+		<label for="desc">Nach:</label>
+		<input type="text" id="desc" name="desc" required/>
+		<label for="datepicker">Datumm:</label>
+		<input type="text" id="datepicker" name="datepicker" required/>
+		<div id="timeSlotContainer" style="display:block;">
+			<label for="time">Choose a time:</label>
+			<select name="date" id="date" required></select>
+		</div>
+		<button type="submit" id="submitBtn" style="display:none;">Submit</button>
+	</form>
+	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+	<script>
+flatpickr("#datepicker", {
+    minDate: "today",
+    disable: [date => date.getDay() === 0],
+    onReady: function(selectedDates, dateStr, instance) {
+        const today = new Date();
+        const currentTime = today.getHours() * 60 + today.getMinutes();
+        if (today.getDay() === 6 && currentTime >= (13 * 60 + 30)) {
+            today.setDate(today.getDate() + 1);
+            instance.set("minDate", today);
+        } else if (today.getDay() >= 1 && today.getDay() <= 5 && currentTime >= (16 * 60 + 30)) {
+            today.setDate(today.getDate() + 1);
+            instance.set("minDate", today);
+        }
+    },
+    onChange: function(selectedDates, dateStr, instance) {
+        document.getElementById("timeSlotContainer").style.display = "block";
+        document.getElementById("submitBtn").style.display = "inline";
+
+        const timeSelect = document.getElementById("date");
+        timeSelect.innerHTML = "";
+        timeSelect.selectedIndex = -1;
+
+        fetch("/api/termins?date=" + dateStr)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error != null) {
+                    document.getElementById("submitBtn").style.display = "none";
+                    return;
+                }
+                data.data.forEach(time => {
+                    const option = document.createElement("option");
+                    option.value = String(time).replace("");
+                    option.textContent = String(time).split(" ").pop();
+                    timeSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error("Error fetching available times:", error));
+    }
+});
+    </script>
+	<style>
+#appointmentForm {
+    max-width: 450px;
+    margin: 30px auto;
+    padding: 25px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    border: 1px solid #eaeaea;
+    text-align: center; /* Center all content */
+}
+
+label {
+    font-weight: 600;
+    display: block;
+    margin-top: 20px;
+    color: #444;
+    font-size: 1rem;
+}
+
+input, select {
+    width: 80%;
+    padding: 12px;
+    margin: 8px auto;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    display: block;
+    text-align: left;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);
+}
+
+#date2 {
+    background-color: #fdfdfd;
+    cursor: pointer;
+}
+
+#submitBtn {
+    width: 80%;
+    padding: 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    margin-top: 20px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    font-weight: 600;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    display: inline-block; /* Ensure it's centered */
+}
+
+#submitBtn:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px); /* Subtle lift effect */
+}
+
+#submitBtn:active {
+    background-color: #004494;
+    transform: translateY(0); /* Slight compression on click */
+}
+
+#timeSlotContainer {
+    margin-top: 20px;
+}
+
+#time {
+    padding: 12px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    border: 2px solid #ddd;
+    font-size: 1rem;
+    transition: border-color 0.2s ease-in-out;
+    width: 80%;
+    margin: 8px auto;
+    text-align: left;
+}
+
+#time:focus {
+    border-color: #007bff;
+}
+
+input::placeholder {
+    color: #bbb;
+    font-style: italic;
+}
+
+    </style>
+}

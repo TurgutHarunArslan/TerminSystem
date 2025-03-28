@@ -4,11 +4,12 @@ import (
 	terminHandler "TerminSystem/Handlers/Termin"
 	terminService "TerminSystem/Repositories/Termin"
 	"TerminSystem/ent"
+	"TerminSystem/templates"
 	"context"
 	"log"
-
-	_ "github.com/mattn/go-sqlite3"
+	"net/http"
 	"github.com/gin-gonic/gin"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 
@@ -30,9 +31,17 @@ func main() {
     r := gin.Default()
     gin.SetMode(gin.DebugMode)
 
-    r.GET("/termins",TerminHandler.GetAppointmentTimes)
-    r.POST("/termins",TerminHandler.BookAppoinment)
-    r.DELETE("/termins",TerminHandler.DeleteAppoinment)
+    api := r.Group("/api")
+
+    api.GET("/termins",TerminHandler.GetAppointmentTimes)
+    api.POST("/termins",TerminHandler.BookAppoinment)
+    api.DELETE("/termins",TerminHandler.DeleteAppoinment)
+
+    r.GET("/", func(c *gin.Context) {
+        c.Status(http.StatusOK)
+        c.Header("Content-Type","text/html")
+        templates.Root().Render(c.Request.Context(),c.Writer)
+    }) 
 
     r.Run(":8080")
 }

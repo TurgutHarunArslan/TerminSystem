@@ -12,6 +12,7 @@ require (
 
 require (
 	ariga.io/atlas v0.31.1-0.20250212144724-069be8033e83 // indirect
+	github.com/a-h/templ v0.3.857 // indirect
 	github.com/agext/levenshtein v1.2.1 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
@@ -51,4 +52,6 @@ require (
 	golang.org/x/text v0.23.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	maragu.dev/gomponents v1.1.0 // indirect
+	maragu.dev/gomponents-htmx v0.6.1 // indirect
 )

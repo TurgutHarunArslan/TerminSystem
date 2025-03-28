@@ -28,12 +28,12 @@ func (h *TerminHandler) GetAppointmentTimes(c *gin.Context) {
 	times, err := h.service.GetTimeSlotsByDate(c.Request.Context(), date)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	if len(times) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Keine Termine"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Keine Termine"})
 		return
 	}
 
@@ -52,7 +52,7 @@ type AppoinmentCreate struct {
 
 func (h *TerminHandler) BookAppoinment(c *gin.Context) {
 	var CreateData AppoinmentCreate
-	if err := c.ShouldBindJSON(&CreateData); err != nil {
+	if err := c.ShouldBind(&CreateData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

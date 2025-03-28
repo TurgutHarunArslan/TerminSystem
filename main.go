@@ -31,6 +31,7 @@ func main() {
     gin.SetMode(gin.DebugMode)
 
     r.GET("/termins",TerminHandler.GetAppointmentTimes)
+    r.POST("/termins",TerminHandler.BookAppoinment)
 
     r.Run(":8080")
 }

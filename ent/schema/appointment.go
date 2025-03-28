@@ -21,7 +21,7 @@ func (Appointment) Fields() []ent.Field {
 			"Goldankauf", "goldankauf",
 			"Trauringe", "trauringe",
 			"Verlobungsringe", "verlobungsringe",
-			"Ohrlohstechen", "ohrlohstechen",
+			"Ohrlochstechen", "ohrlochstechen",
 			"Sonstiges", "sonstiges",
 		),
 		field.String("delkey").

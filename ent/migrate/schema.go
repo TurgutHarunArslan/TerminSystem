@@ -14,7 +14,7 @@ var (
 		{Name: "name", Type: field.TypeString},
 		{Name: "email", Type: field.TypeString},
 		{Name: "phone", Type: field.TypeString},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"goldankauf", "trauringe", "verlobungsringe", "ohrlohstechen", "sonstiges"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"goldankauf", "trauringe", "verlobungsringe", "ohrlochstechen", "sonstiges"}},
 		{Name: "delkey", Type: field.TypeString},
 		{Name: "start_time", Type: field.TypeTime},
 		{Name: "end_time", Type: field.TypeTime},

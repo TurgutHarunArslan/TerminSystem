@@ -29,12 +29,14 @@ func TestBookAppointment(t *testing.T) {
 
 	service := NewAppointmentService(client)
 
-	dates := service.GetAvailableDates(ctx,14)
-	assert.NotEmpty(t,dates)
-
+	dates := service.GetAvailableDates(ctx, 14)
+	assert.NotEmpty(t, dates)
 
 	var day time.Time
-	for _, v := range dates {
+	for i, v := range dates {
+		if i == 0 {
+			continue
+		}
 		date, err := time.Parse("2006-01-02", v)
 		assert.NoError(t, err)
 
@@ -51,7 +53,7 @@ func TestBookAppointment(t *testing.T) {
 	Type := appointment.TypeSonstiges
 	start := day.Add(10 * time.Hour)
 
-	appointment, err := service.BookAppointment(ctx,name, email, phone, description, Type, start)
+	appointment, err := service.BookAppointment(ctx, name, email, phone, description, Type, start)
 	assert.NoError(t, err)
 	assert.NotNil(t, appointment)
 
@@ -64,7 +66,6 @@ func TestBookAppointment(t *testing.T) {
 
 	assert.WithinDuration(t, start, appointments[0].StartTime, time.Second)
 }
-
 
 func TestGetAvailableDatesLength(t *testing.T) {
 	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&_fk=1")
@@ -94,8 +95,11 @@ func TestWeekday(t *testing.T) {
 
 	dates := service.GetAvailableDates(ctx, 7)
 
-	var tomorrow  string
-	for _, v := range dates {
+	var tomorrow string
+	for i, v := range dates {
+		if i == 0 {
+			continue
+		}
 		date, err := time.Parse("2006-01-02", v)
 		assert.NoError(t, err)
 
@@ -105,7 +109,7 @@ func TestWeekday(t *testing.T) {
 		}
 	}
 
-	timeslots, err := service.GetTimeSlotsByDate(ctx,tomorrow)
+	timeslots, err := service.GetTimeSlotsByDate(ctx, tomorrow)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, timeslots)
@@ -113,10 +117,9 @@ func TestWeekday(t *testing.T) {
 	TimeStart := timeslots[0]
 	TimeEnd := timeslots[len(timeslots)-1]
 
-	assert.Equal(t, tomorrow + " 10:00", TimeStart)
-	assert.Equal(t, tomorrow + " 16:30", TimeEnd)
+	assert.Equal(t, tomorrow+" 10:00", TimeStart)
+	assert.Equal(t, tomorrow+" 16:30", TimeEnd)
 }
-
 
 func TestDateValidator(t *testing.T) {
 	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&_fk=1")
@@ -128,32 +131,97 @@ func TestDateValidator(t *testing.T) {
 
 	service := NewAppointmentService(client)
 
-
-	today := time.Now().Truncate(24 *time.Hour)
-
-	isValid,err := service.IsValidTerminDate(today.AddDate(0,0,-1).Format("2006-01-02"),"")
-
-	assert.False(t,isValid)
-	assert.Error(t,err)
-
-	isValid,err = service.IsValidTerminDate(today.Format("2006-01-02"),today.Add(11 *time.Hour).Format("15:04"),today)
-
-	assert.True(t,isValid)
-	assert.NoError(t,err)
-
-	daysUntilSaturday := (6 - int(today.Weekday()) + 7) % 7
-	if daysUntilSaturday == 0 {
-		daysUntilSaturday = 7
+	loc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		t.Fatal("Could not load Loc")
 	}
 
-	isValid,err = service.IsValidTerminDate(time.Now().AddDate(0,0,daysUntilSaturday).Format("2006-01-02"),"",today)
+	today := time.Now().In(loc).Truncate(24 * time.Hour)
 
-	assert.True(t,isValid)
-	assert.NoError(t,err)
+	tests := []struct {
+		name      string
+		date      string
+		time      string
+		reference time.Time
+		expected  bool
+		expectErr bool
+		ErrId     int
+	}{
+		{
+			name:      "past date",
+			date:      today.AddDate(0, 0, -1).Format("2006-01-02"),
+			time:      "",
+			reference: today,
+			expected:  false,
+			expectErr: true,
+			ErrId:     DateInPastErrorCode,
+		},
+		{
+			name:      "today",
+			date:      today.Format("2006-01-02"),
+			time:      "",
+			reference: today,
+			expected:  true,
+			expectErr: false,
+			ErrId:     -1,
+		},
+		{
+			name:      "valid date and time",
+			date:      today.Format("2006-01-02"),
+			time:      today.Add(11 * time.Hour).Format("15:04"),
+			reference: today,
+			expected:  true,
+			expectErr: false,
+			ErrId:     -1,
+		},
+		{
+			name:      "valid date without time (edgecase to check if reference date gets compared without time)",
+			date:      today.Format("2006-01-02"),
+			time:      "",
+			reference: today,
+			expected:  true,
+			expectErr: false,
+			ErrId:     -1,
+		},
+		{
+			name:      "next Saturday",
+			date:      today.AddDate(0, 0, (6-int(today.Weekday())+7)%7).Format("2006-01-02"),
+			time:      "",
+			reference: today,
+			expected:  true,
+			expectErr: false,
+			ErrId:     -1,
+		},
+		{
+			name:      "invalid time on Saturday",
+			date:      today.AddDate(0, 0, (6-int(today.Weekday())+7)%7).Format("2006-01-02"),
+			time:      today.Add(15 * time.Hour).Format("15:04"),
+			reference: today,
+			expected:  false,
+			expectErr: true,
+			ErrId:     DateShopClosedErrorCode,
+		},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isValid, err := service.IsValidTerminDate(tt.date, tt.time, tt.reference)
 
-	isValid,err = service.IsValidTerminDate(time.Now().AddDate(0,0,daysUntilSaturday).Format("2006-01-02"),today.Add(15 * time.Hour).Format("15:04"),today)
+			assert.Equal(t, tt.expected, isValid)
+			if tt.expectErr {
+				assert.Error(t, err)
 
-	assert.False(t,isValid)
-	assert.Error(t,err)
+				customErr, ok := err.(*AppointmentError)
+				if !ok {
+					t.Fatal("Wrong Error type return?", err.Error())
+				}
+				if tt.ErrId > -1 {
+					assert.Equal(t, tt.ErrId, customErr.Code)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+		})
+	}
 }

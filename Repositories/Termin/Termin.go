@@ -5,10 +5,8 @@ import (
 	"TerminSystem/ent/appointment"
 	"context"
 	"fmt"
-	"log"
-	"time"
-
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"time"
 )
 
 type AppointmentService struct {
@@ -35,23 +33,34 @@ func (s *AppointmentService) GetBusinessHours(weekday time.Weekday) (int, int) {
 func (s *AppointmentService) IsValidTerminDate(dateStr string, timeStr string, now ...time.Time) (bool, error) {
 	parsedDate, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		return false, fmt.Errorf("invalid date format: %v", err)
+		return false, InvalidDateError(dateStr)
+	}
+
+	loc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		return false, LocationLoadError()
 	}
 
 	var currentTime time.Time
 	if len(now) > 0 && !now[0].IsZero() {
 		currentTime = now[0]
 	} else {
-		currentTime = time.Now().UTC()
+		currentTime = time.Now().In(loc)
 	}
 
 	var targetTime time.Time
 	if timeStr != "" {
 		parsedTime, err := time.Parse("15:04", timeStr)
 		if err != nil {
-			return false, fmt.Errorf("invalid time format: %v", err)
+			return false, InvalidDateError(timeStr)
 		}
-		targetTime = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), parsedTime.Hour(), parsedTime.Minute(), 0, 0, time.UTC)
+
+		loc, err := time.LoadLocation("Europe/Berlin")
+		if err != nil {
+			return false, LocationLoadError()
+		}
+
+		targetTime = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), parsedTime.Hour(), parsedTime.Minute(), 0, 0, loc)
 	} else {
 		targetTime = parsedDate
 	}
@@ -59,15 +68,26 @@ func (s *AppointmentService) IsValidTerminDate(dateStr string, timeStr string, n
 	weekday := parsedDate.Weekday()
 	startHour, endHour := s.GetBusinessHours(weekday)
 	if startHour == -1 {
-		return false, fmt.Errorf("business is closed on %s", weekday)
+		return false, DateShopClosedError(weekday.String())
 	}
 
-	if targetTime.Before(currentTime) {
-		return false, fmt.Errorf("the date and time %s %s is in the past", dateStr, timeStr)
+	dateOnly := timeStr == ""
+	var compareTime time.Time
+
+	if dateOnly {
+		compareTime = targetTime.Truncate(24 * time.Hour)
+		currentDate := currentTime.Truncate(24 * time.Hour)
+		if compareTime.Before(currentDate) {
+			return false, DateInPastError(compareTime.String(), currentDate.String())
+		}
+	} else {
+		if targetTime.Before(currentTime) {
+			return false, DateInPastError(targetTime.String(), currentTime.String())
+		}
 	}
 
 	if timeStr != "" && (targetTime.Hour() < startHour || targetTime.Hour() >= endHour) {
-		return false, fmt.Errorf("time %s is outside of business hours (%02d:00 - %02d:00)", timeStr, startHour, endHour)
+		return false, DateShopClosedError(targetTime.String())
 	}
 
 	return true, nil
@@ -75,7 +95,15 @@ func (s *AppointmentService) IsValidTerminDate(dateStr string, timeStr string, n
 
 func (s *AppointmentService) GetAvailableDates(ctx context.Context, days int) []string {
 	var availableDates []string
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+
+	loc, err := time.LoadLocation("Europe/Berlin")
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return availableDates
+	}
+
+	today := time.Now().In(loc).Truncate(24 * time.Hour)
 	createdDays := 0
 	for i := 0; createdDays < days; i++ {
 		date := today.AddDate(0, 0, i)
@@ -94,20 +122,27 @@ func (s *AppointmentService) GetAvailableDates(ctx context.Context, days int) []
 
 func (s *AppointmentService) GetTimeSlotsByDate(ctx context.Context, dateStr string) ([]string, error) {
 	parsedDate, err := time.Parse("2006-01-02", dateStr)
-	currentTime := time.Now()
+
+	loc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		return nil, LocationLoadError()
+	}
+
+	currentTime := time.Now().In(loc)
 
 	isValid, err := s.IsValidTerminDate(dateStr, "")
+
 	if !isValid {
 		return nil, err
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("invalid date format: %v", err)
+		return nil, InvalidDateError(dateStr)
 	}
 
 	var terminSlots []string
 	if parsedDate.Before(currentTime.Truncate(24 * time.Hour)) {
-		return nil, fmt.Errorf("%s Was Requested But The Date Is Past \n", parsedDate.String())
+		return nil, DateInPastError(dateStr, currentTime.String())
 	}
 
 	weekday := currentTime.Weekday()
@@ -122,7 +157,7 @@ func (s *AppointmentService) GetTimeSlotsByDate(ctx context.Context, dateStr str
 				continue
 			}
 
-			datestr := parsedDate.Add(time.Hour * time.Duration(hour) + time.Minute * time.Duration(minute))
+			datestr := parsedDate.Add(time.Hour*time.Duration(hour) + time.Minute*time.Duration(minute))
 			terminSlots = append(terminSlots, datestr.Format("2006-01-02 15:04"))
 		}
 	}
@@ -136,13 +171,19 @@ func (s *AppointmentService) BookAppointment(ctx context.Context, name, email, p
 		return nil, err
 	}
 
-	if time.Now().Add(24 * time.Hour * 28).Before(date) {
-		return nil, fmt.Errorf("this appointment is not ready yet")
+
+	loc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		return nil, LocationLoadError()
+	}
+
+	if time.Now().In(loc).Add(24 * time.Hour * 28).Before(date) {
+		return nil, DateNotReadyError(date.String())
 	}
 
 	isValid, err := s.IsValidTerminDate(date.Truncate(24*time.Hour).Format("2006-01-02"), date.Format("15:04"))
 	if !isValid || err != nil {
-		return nil, fmt.Errorf("Kein gültiges Datum")
+		return nil, err
 	}
 
 	return s.client.Appointment.Create().
@@ -159,16 +200,4 @@ func (s *AppointmentService) BookAppointment(ctx context.Context, name, email, p
 
 func (s *AppointmentService) DeleteAppointment(ctx context.Context, id int) error {
 	return s.client.Appointment.DeleteOneID(id).Exec(ctx)
-}
-
-func (s *AppointmentService) ListAppointments(ctx context.Context) {
-	appointments, err := s.client.Appointment.Query().All(ctx)
-	if err != nil {
-		log.Fatalf("failed to list appointments: %v", err)
-	}
-	fmt.Println("Current Appointments:")
-	for _, a := range appointments {
-		fmt.Printf("ID: %d, Name: %s, Start: %s, End: %s\n",
-			a.ID, a.Name, a.StartTime.Format("2006-01-02 15:04"), a.EndTime.Format("15:04"))
-	}
 }

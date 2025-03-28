@@ -37,7 +37,7 @@ func (h *TerminHandler) GetAppointmentTimes(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"termins": times})
+	c.JSON(http.StatusOK, gin.H{"data": times})
 	return
 }
 
@@ -72,5 +72,25 @@ func (h *TerminHandler) BookAppoinment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK,gin.H{"data":appoinment.String()})
+	return
+}
+
+
+
+func (h *TerminHandler) DeleteAppoinment(c *gin.Context) {
+	key := c.Query("key")
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "key ist erforderlich"})
+		return
+	}
+
+	err := h.service.DeleteAppointment(c.Request.Context(), key)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": "Termin Losen"})
 	return
 }

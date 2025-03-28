@@ -32,6 +32,7 @@ func main() {
 
     r.GET("/termins",TerminHandler.GetAppointmentTimes)
     r.POST("/termins",TerminHandler.BookAppoinment)
+    r.DELETE("/termins",TerminHandler.DeleteAppoinment)
 
     r.Run(":8080")
 }

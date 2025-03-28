@@ -198,6 +198,7 @@ func (s *AppointmentService) BookAppointment(ctx context.Context, name, email, p
 		Save(ctx)
 }
 
-func (s *AppointmentService) DeleteAppointment(ctx context.Context, id int) error {
-	return s.client.Appointment.DeleteOneID(id).Exec(ctx)
+func (s *AppointmentService) DeleteAppointment(ctx context.Context, delkey string) error {
+	_, err := s.client.Appointment.Delete().Where(appointment.DelkeyEQ(delkey)).Exec(ctx)
+	return err
 }
